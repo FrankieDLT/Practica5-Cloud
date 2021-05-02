@@ -1,0 +1,81 @@
+const AWS = require('aws-sdk');
+const docClient = new AWS.DynamoDB.DocumentClient({ region: 'us-east-1' });
+const TABLE = "DogHushMovil";
+
+exports.handler = async (event, context) => {
+    let Method = event.httpMethod;
+    let body;
+    
+    let statusCode = 200;
+ 
+    
+    switch (Method) {
+            case 'GET':
+                body = await docClient.scan({ TableName: TABLE }).promise();
+				break;
+			case 'POST':
+			    const paramsPost = {
+			        TableName: TABLE,
+			        Item:{
+			            Name: event.name,
+			            Email: event.email,
+			            accessToken: event.token,
+			            songs: [{
+			                hex:event.hex,
+			                date:Date.now(),
+			                active:true
+			               }]
+			        },
+			        ConditionExpression: "attribute_not_exists(#name) and attribute_not_exists(#email)",
+			        ExpressionAttributeNames: {
+			            "#name": "Name",
+			            "#email": "Email",
+			        },
+			    };
+			    body = await docClient.put(paramsPost).promise();
+                break;
+            case 'PUT':
+                const paramsPut = {
+                    TableName: TABLE,
+                    Item: {
+                        Name:event.name,
+                        Email:event.email,
+                        keyToUpdate:event.keyToUpdate,
+                        valueUpdated:event.valueUpdated
+                    },
+                    Key: {
+                        "Name": event.name,
+                        "Email": event.email
+                    },
+                    UpdateExpression: "set #name = :n",
+                    ExpressionAttributeNames: {
+                        "#name": event.keyToUpdate,
+                    },
+                    ExpressionAttributeValues: {
+                        ":n": event.valueUpdated,
+                    },
+                    ReturnValues: "UPDATED_NEW"
+                };
+                body = await docClient.update(paramsPut).promise();
+                break;
+            case 'DELETE':
+                const paramsDelete = {
+                    TableName: TABLE,
+                    Key: {
+                        Name: event.name,
+                        Email: event.email
+                    }
+                };
+                body = await docClient.delete(paramsDelete).promise();
+            break;
+            
+            default:
+                statusCode = 500;
+                body = 'Error con el metodo';
+        }
+    
+    return {
+        statusCode,
+        body
+    };
+};
